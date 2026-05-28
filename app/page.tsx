@@ -1,149 +1,125 @@
 "use client";
 
-import { useState } from "react";
-import type { AnswerPrelude, Source } from "@/lib/types";
-
-type StreamState = {
-  loading: boolean;
-  answer: string;
-  sources: Source[];
-  error: string | null;
-};
-
-const INITIAL: StreamState = {
-  loading: false,
-  answer: "",
-  sources: [],
-  error: null,
-};
+import { useRef, useState } from "react";
+import { AnswerStream } from "@/components/AnswerStream";
+import { EndpointToggle } from "@/components/EndpointToggle";
+import { SourceCard } from "@/components/SourceCard";
+import { StatsBar } from "@/components/StatsBar";
+import { useAnswerStream } from "@/components/useAnswerStream";
+import type { Endpoint } from "@/lib/types";
 
 export default function Home() {
   const [question, setQuestion] = useState("");
-  const [state, setState] = useState<StreamState>(INITIAL);
+  const [endpoint, setEndpoint] = useState<Endpoint>("web");
+  const [highlighted, setHighlighted] = useState<number | null>(null);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { state, run } = useAnswerStream();
 
-  async function handleSubmit(e: React.FormEvent) {
+  const busy = state.status === "streaming";
+  const { prelude, answer, error, status } = state;
+
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const q = question.trim();
-    if (!q || state.loading) return;
+    if (!q || busy) return;
+    run(q, endpoint);
+  }
 
-    setState({ loading: true, answer: "", sources: [], error: null });
-
-    try {
-      const res = await fetch("/api/answer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // endpoint is fixed to "web" for Cycle 1; the toggle arrives in Cycle 2.
-        body: JSON.stringify({ question: q, endpoint: "web" }),
+  function handleCite(n: number) {
+    const el = document.getElementById(`source-${n}`);
+    if (el) {
+      const reduce = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      el.scrollIntoView({
+        behavior: reduce ? "auto" : "smooth",
+        block: "center",
       });
-
-      if (!res.ok || !res.body) {
-        const text = await res.text().catch(() => "");
-        setState((s) => ({
-          ...s,
-          loading: false,
-          error: text || `Request failed (${res.status})`,
-        }));
-        return;
-      }
-
-      // Read the NDJSON prelude (first line = { sources }), then stream text.
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let sawPrelude = false;
-      let answer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        if (!sawPrelude) {
-          const nl = buffer.indexOf("\n");
-          if (nl === -1) continue;
-          const line = buffer.slice(0, nl);
-          buffer = buffer.slice(nl + 1);
-          sawPrelude = true;
-          try {
-            const prelude = JSON.parse(line) as AnswerPrelude;
-            setState((s) => ({ ...s, sources: prelude.sources }));
-          } catch {
-            // Ignore a malformed prelude; keep streaming the answer text.
-          }
-        }
-
-        if (sawPrelude && buffer) {
-          answer += buffer;
-          buffer = "";
-          setState((s) => ({ ...s, answer }));
-        }
-      }
-
-      setState((s) => ({ ...s, loading: false }));
-    } catch (err) {
-      setState((s) => ({
-        ...s,
-        loading: false,
-        error: err instanceof Error ? err.message : "Something went wrong",
-      }));
     }
+    setHighlighted(n);
+    if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    highlightTimer.current = setTimeout(() => setHighlighted(null), 1500);
   }
 
   return (
-    <main className="mx-auto max-w-2xl p-6">
-      <h1 className="text-2xl font-bold">Sourced</h1>
-      <p className="mt-1 text-sm text-gray-600">
-        Ask a question. Get a grounded, cited answer from the live web.
-      </p>
+    <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 px-4 py-10 sm:py-16">
+      <header>
+        <h1 className="text-3xl font-bold tracking-tight">Sourced</h1>
+        <p className="mt-1 text-sm text-gray-500 dark:text-neutral-400">
+          A grounded answer engine. Ask a question — get a streamed, cited answer
+          from Brave&apos;s independent web index.
+        </p>
+      </header>
 
-      <form onSubmit={handleSubmit} className="mt-4 flex gap-2">
-        <input
-          type="text"
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Ask anything..."
-          disabled={state.loading}
-          className="flex-1 rounded border border-gray-300 px-3 py-2"
-        />
-        <button
-          type="submit"
-          disabled={state.loading || !question.trim()}
-          className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
-        >
-          {state.loading ? "..." : "Ask"}
-        </button>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <EndpointToggle value={endpoint} onChange={setEndpoint} disabled={busy} />
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            placeholder="Ask anything..."
+            maxLength={400}
+            disabled={busy}
+            className="flex-1 rounded-lg border border-gray-300 bg-transparent px-3 py-2 outline-none focus:border-orange-500 dark:border-neutral-700"
+          />
+          <button
+            type="submit"
+            disabled={busy || !question.trim()}
+            className="rounded-lg bg-orange-600 px-4 py-2 font-medium text-white transition hover:bg-orange-700 disabled:opacity-50"
+          >
+            {busy ? "Asking..." : "Ask"}
+          </button>
+        </div>
       </form>
 
-      {state.error && <p className="mt-4 text-sm text-red-600">{state.error}</p>}
+      {error && (
+        <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+          {error}
+        </p>
+      )}
 
-      {state.answer && (
-        <section className="mt-6 whitespace-pre-wrap leading-relaxed">
-          {state.answer}
+      {prelude && <StatsBar prelude={prelude} />}
+
+      {busy && !answer && (
+        <div className="space-y-2" aria-hidden>
+          <div className="h-4 w-3/4 animate-pulse rounded bg-gray-200 dark:bg-neutral-800" />
+          <div className="h-4 w-full animate-pulse rounded bg-gray-200 dark:bg-neutral-800" />
+          <div className="h-4 w-5/6 animate-pulse rounded bg-gray-200 dark:bg-neutral-800" />
+        </div>
+      )}
+
+      {answer && (
+        <section aria-label="Answer">
+          <AnswerStream
+            text={answer}
+            sourceCount={prelude?.source_count ?? 0}
+            onCite={handleCite}
+          />
         </section>
       )}
 
-      {state.sources.length > 0 && (
-        <section className="mt-8">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+      {prelude && prelude.sources.length > 0 && (
+        <section aria-label="Sources">
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-neutral-400">
             Sources
           </h2>
-          <ol className="mt-2 space-y-3">
-            {state.sources.map((s) => (
-              <li key={s.index} className="text-sm">
-                <span className="font-mono text-gray-400">[{s.index}]</span>{" "}
-                <a
-                  href={s.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium underline"
-                >
-                  {s.title}
-                </a>
-                <p className="text-gray-600">{s.snippet}</p>
-              </li>
+          <ol className="space-y-2">
+            {prelude.sources.map((s) => (
+              <SourceCard
+                key={s.index}
+                source={s}
+                highlighted={highlighted === s.index}
+              />
             ))}
           </ol>
         </section>
+      )}
+
+      {status === "done" && prelude?.sources.length === 0 && (
+        <p className="text-sm text-gray-500 dark:text-neutral-400">
+          No sources found for that question. Try rephrasing.
+        </p>
       )}
     </main>
   );

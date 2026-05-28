@@ -19,5 +19,6 @@ export function buildSystemPrompt(): string {
     "If the sources do not contain enough information to answer, say so plainly instead of guessing.",
     "Never invent facts, URLs, or sources beyond those provided.",
     "Keep the answer concise and directly responsive to the question.",
+    "Write in plain prose; do not use markdown headings, bold, bullet lists, or code fences.",
   ].join(" ");
 }
