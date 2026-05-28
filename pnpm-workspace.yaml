@@ -1,0 +1,7 @@
+allowBuilds:
+  sharp: true
+  unrs-resolver: true
+minimumReleaseAgeExclude:
+  - '@ai-sdk/anthropic@3.0.81'
+  - '@ai-sdk/gateway@3.0.121'
+  - ai@6.0.192
