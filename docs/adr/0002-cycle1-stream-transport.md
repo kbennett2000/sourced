@@ -58,3 +58,26 @@ semi-internal parsing helpers.
   (`createUIMessageStream` + `useChat`) when the UI gains polish; only those two
   files change. This is a refinement of `docs/architecture.md`, not a change to
   ADR 0001 (which is silent on wire format).
+
+## Cycle 2 update — extended prelude shape
+
+The prelude grew from `{ sources }` to carry endpoint telemetry so the UI can
+show the Web-Search-vs-LLM-Context tradeoff (source count + retrieval latency):
+
+```jsonc
+// first NDJSON line of the answer stream
+{
+  "endpoint": "web" | "context",
+  "retrieval_ms": 878,        // full Brave round trip incl. JSON parse
+  "source_count": 10,
+  "sources": [ { "index": 1, "title": "...", "url": "...", "snippet": "..." }, ... ]
+}
+```
+
+- Wire keys are snake_case by contract (`retrieval_ms`, `source_count`); the
+  shape is the `AnswerPrelude` type in `lib/types.ts`, built by the pure
+  `buildPrelude()` in `lib/prelude.ts` (kept out of the route so it's testable
+  without importing the AI SDK).
+- `retrieval_ms` measures the **full** Brave round trip, including `res.json()`
+  parsing — the honest number to surface to a user, and cheap for ~10 results.
+- Backward compatible: `sources` remains present, so the change is additive.

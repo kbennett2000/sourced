@@ -3,7 +3,7 @@ import { logger } from "@/lib/logger";
 import {
   BraveLlmContextResponseSchema,
   BraveWebSearchResponseSchema,
-  type Source,
+  type RetrievalResult,
 } from "@/lib/types";
 
 const WEB_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search";
@@ -21,7 +21,10 @@ export class BraveError extends Error {
   }
 }
 
-async function braveFetch(url: string, query: string): Promise<unknown> {
+async function braveFetch(
+  url: string,
+  query: string,
+): Promise<{ data: unknown; ms: number }> {
   const { BRAVE_API_KEY } = getEnv();
   const endpoint = url === WEB_SEARCH_URL ? "web" : "context";
 
@@ -40,32 +43,42 @@ async function braveFetch(url: string, query: string): Promise<unknown> {
     },
   });
 
-  logger.info("brave.request", {
-    endpoint,
-    status: res.status,
-    ms: Date.now() - start,
-    rateLimitRemaining: res.headers.get("X-RateLimit-Remaining"),
-  });
-
   if (!res.ok) {
     const body = await res.text().catch(() => "");
+    logger.warn("brave.request", {
+      endpoint,
+      status: res.status,
+      ms: Date.now() - start,
+      rateLimitRemaining: res.headers.get("X-RateLimit-Remaining"),
+    });
     throw new BraveError(res.status, body);
   }
 
-  return res.json();
+  const data = await res.json();
+  // Measure the full round trip (network + body parse) for an honest retrieval_ms.
+  const ms = Date.now() - start;
+
+  logger.info("brave.request", {
+    endpoint,
+    status: res.status,
+    ms,
+    rateLimitRemaining: res.headers.get("X-RateLimit-Remaining"),
+  });
+
+  return { data, ms };
 }
 
-/** Brave Web Search → normalized Source[] (snippet = result description). */
-export async function webSearch(query: string): Promise<Source[]> {
-  const json = await braveFetch(WEB_SEARCH_URL, query);
-  const parsed = BraveWebSearchResponseSchema.safeParse(json);
+/** Brave Web Search → normalized sources + retrieval time (snippet = description). */
+export async function webSearch(query: string): Promise<RetrievalResult> {
+  const { data, ms } = await braveFetch(WEB_SEARCH_URL, query);
+  const parsed = BraveWebSearchResponseSchema.safeParse(data);
   if (!parsed.success) {
     logger.warn("brave.web.parse_failed", { issues: parsed.error.issues.length });
-    return [];
+    return { sources: [], retrievalMs: ms };
   }
 
   const results = parsed.data.web?.results ?? [];
-  return results
+  const sources = results
     .filter((r) => r.url)
     .map((r, i) => ({
       index: i + 1,
@@ -73,17 +86,18 @@ export async function webSearch(query: string): Promise<Source[]> {
       url: r.url,
       snippet: r.description,
     }));
+  return { sources, retrievalMs: ms };
 }
 
-/** Brave LLM Context → normalized Source[] (snippet = joined content chunks). */
-export async function llmContext(query: string): Promise<Source[]> {
-  const json = await braveFetch(LLM_CONTEXT_URL, query);
-  const parsed = BraveLlmContextResponseSchema.safeParse(json);
+/** Brave LLM Context → normalized sources + retrieval time (snippet = joined chunks). */
+export async function llmContext(query: string): Promise<RetrievalResult> {
+  const { data, ms } = await braveFetch(LLM_CONTEXT_URL, query);
+  const parsed = BraveLlmContextResponseSchema.safeParse(data);
   if (!parsed.success) {
     logger.warn("brave.context.parse_failed", {
       issues: parsed.error.issues.length,
     });
-    return [];
+    return { sources: [], retrievalMs: ms };
   }
 
   const items = parsed.data.grounding?.generic ?? [];
@@ -99,5 +113,5 @@ export async function llmContext(query: string): Promise<Source[]> {
   if (sources.length === 0) {
     logger.warn("brave.context.empty", { rawItems: items.length });
   }
-  return sources;
+  return { sources, retrievalMs: ms };
 }

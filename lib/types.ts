@@ -12,6 +12,24 @@ export type Source = z.infer<typeof SourceSchema>;
 /** The retrieval endpoints exposed by the app. */
 export type Endpoint = "web" | "context";
 
+/** Result of a single Brave retrieval call: normalized sources + elapsed time. */
+export type RetrievalResult = {
+  sources: Source[];
+  retrievalMs: number;
+};
+
+/**
+ * First NDJSON line of the answer stream. Carries everything the client needs
+ * to render the stats bar and source cards before answer text arrives.
+ * Wire keys are snake_case by contract; see docs/adr/0002.
+ */
+export type AnswerPrelude = {
+  endpoint: Endpoint;
+  retrieval_ms: number;
+  source_count: number;
+  sources: Source[];
+};
+
 /** Request body for POST /api/answer. */
 export const AnswerRequestSchema = z.object({
   question: z.string().trim().min(1, "question is required").max(400, "question is too long"),

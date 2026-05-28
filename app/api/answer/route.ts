@@ -2,9 +2,10 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { streamText } from "ai";
 import { BraveError, llmContext, webSearch } from "@/lib/brave";
 import { logger } from "@/lib/logger";
+import { buildPrelude } from "@/lib/prelude";
 import { buildContext, buildSystemPrompt } from "@/lib/prompt";
 import { checkRateLimit } from "@/lib/ratelimit";
-import { AnswerRequestSchema, type Source } from "@/lib/types";
+import { AnswerRequestSchema, type RetrievalResult } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -48,9 +49,9 @@ export async function POST(req: Request): Promise<Response> {
   logger.info("answer.request", { endpoint, questionLength: question.length });
 
   // 3. Retrieve sources via the selected endpoint.
-  let sources: Source[];
+  let retrieval: RetrievalResult;
   try {
-    sources =
+    retrieval =
       endpoint === "web" ? await webSearch(question) : await llmContext(question);
   } catch (err) {
     if (err instanceof BraveError) {
@@ -65,13 +66,13 @@ export async function POST(req: Request): Promise<Response> {
 
   // 4. Ground + 5. stream.
   const system = buildSystemPrompt();
-  const prompt = `Context:\n${buildContext(sources)}\n\nQuestion: ${question}`;
+  const prompt = `Context:\n${buildContext(retrieval.sources)}\n\nQuestion: ${question}`;
 
   try {
     const result = streamText({ model: anthropic(MODEL), system, prompt });
     const encoder = new TextEncoder();
-    // Prelude: sources as the first NDJSON line, then streamed answer text.
-    const prelude = JSON.stringify({ sources }) + "\n";
+    // Prelude: endpoint stats + sources as the first NDJSON line, then text.
+    const prelude = JSON.stringify(buildPrelude(endpoint, retrieval)) + "\n";
 
     const body = new ReadableStream<Uint8Array>({
       async start(controller) {

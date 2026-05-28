@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Source } from "@/lib/types";
+import type { AnswerPrelude, Source } from "@/lib/types";
 
 type StreamState = {
   loading: boolean;
@@ -65,8 +65,8 @@ export default function Home() {
           buffer = buffer.slice(nl + 1);
           sawPrelude = true;
           try {
-            const { sources } = JSON.parse(line) as { sources: Source[] };
-            setState((s) => ({ ...s, sources }));
+            const prelude = JSON.parse(line) as AnswerPrelude;
+            setState((s) => ({ ...s, sources: prelude.sources }));
           } catch {
             // Ignore a malformed prelude; keep streaming the answer text.
           }

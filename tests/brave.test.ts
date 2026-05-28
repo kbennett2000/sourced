@@ -38,11 +38,13 @@ describe("webSearch", () => {
       }),
     );
 
-    const sources = await webSearch("hello");
-    expect(sources).toEqual([
+    const result = await webSearch("hello");
+    expect(result.sources).toEqual([
       { index: 1, title: "T1", url: "https://1.com", snippet: "D1" },
       { index: 2, title: "T2", url: "https://2.com", snippet: "D2" },
     ]);
+    expect(typeof result.retrievalMs).toBe("number");
+    expect(result.retrievalMs).toBeGreaterThanOrEqual(0);
   });
 
   it("sends the X-Subscription-Token header", async () => {
@@ -89,18 +91,21 @@ describe("llmContext", () => {
       }),
     );
 
-    const sources = await llmContext("q");
-    expect(sources).toEqual([
+    const result = await llmContext("q");
+    expect(result.sources).toEqual([
       { index: 1, title: "X", url: "https://x.com", snippet: "a b" },
     ]);
+    expect(typeof result.retrievalMs).toBe("number");
+    expect(result.retrievalMs).toBeGreaterThanOrEqual(0);
   });
 
-  it("returns [] when grounding is missing (tolerant to shape drift)", async () => {
+  it("returns no sources when grounding is missing (tolerant to shape drift)", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       mockResponse({ ok: true, status: 200, json: {} }),
     );
 
-    await expect(llmContext("q")).resolves.toEqual([]);
+    const result = await llmContext("q");
+    expect(result.sources).toEqual([]);
   });
 
   it("throws BraveError on a non-200 response", async () => {
