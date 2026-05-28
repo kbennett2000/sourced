@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/social-preview.png" alt="Reference app for Brave RAG / agent use cases" width="100%" />
+</p>
+
 # Sourced
 
 Sourced is a working reference app for the [Brave Search API](https://brave.com/search/api/),
