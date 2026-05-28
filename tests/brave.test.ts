@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BraveError, llmContext, webSearch } from "@/lib/brave";
+import { BraveError, llmContext, stripHtml, webSearch } from "@/lib/brave";
 
 function mockResponse(opts: {
   ok: boolean;
@@ -17,9 +17,45 @@ function mockResponse(opts: {
   } as unknown as Response;
 }
 
+describe("stripHtml", () => {
+  it("removes tags and decodes common entities", () => {
+    expect(stripHtml("<strong>Google&#x27;s AI Mode</strong> &amp; more")).toBe(
+      "Google's AI Mode & more",
+    );
+  });
+
+  it("leaves plain prose untouched", () => {
+    expect(stripHtml("Just plain text.")).toBe("Just plain text.");
+  });
+});
+
 describe("webSearch", () => {
   beforeEach(() => vi.stubGlobal("fetch", vi.fn()));
   afterEach(() => vi.unstubAllGlobals());
+
+  it("strips HTML markup from result titles and descriptions", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      mockResponse({
+        ok: true,
+        status: 200,
+        json: {
+          web: {
+            results: [
+              {
+                title: "<strong>Brave</strong>",
+                url: "https://brave.com",
+                description: "Search with <strong>Brave&#x27;s</strong> index",
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    const { sources } = await webSearch("q");
+    expect(sources[0].title).toBe("Brave");
+    expect(sources[0].snippet).toBe("Search with Brave's index");
+  });
 
   it("normalizes web results into a 1-based Source[]", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(

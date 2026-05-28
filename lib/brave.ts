@@ -10,6 +10,28 @@ const WEB_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search";
 const LLM_CONTEXT_URL = "https://api.search.brave.com/res/v1/llm/context";
 const DEFAULT_COUNT = 10;
 
+const HTML_ENTITIES: Record<string, string> = {
+  "&amp;": "&",
+  "&lt;": "<",
+  "&gt;": ">",
+  "&quot;": '"',
+  "&#39;": "'",
+  "&#x27;": "'",
+  "&nbsp;": " ",
+};
+
+/**
+ * Brave web `description` snippets contain HTML highlight tags (`<strong>`) and
+ * entities (`&#x27;`); strip them so source cards render clean text. A no-op for
+ * already-plain prose.
+ */
+export function stripHtml(s: string): string {
+  return s
+    .replace(/<[^>]*>/g, "")
+    .replace(/&(?:amp|lt|gt|quot|#39|#x27|nbsp);/g, (m) => HTML_ENTITIES[m] ?? m)
+    .trim();
+}
+
 /** Thrown when Brave returns a non-2xx response. Carries status + raw body. */
 export class BraveError extends Error {
   constructor(
@@ -82,9 +104,9 @@ export async function webSearch(query: string): Promise<RetrievalResult> {
     .filter((r) => r.url)
     .map((r, i) => ({
       index: i + 1,
-      title: r.title || r.url,
+      title: stripHtml(r.title) || r.url,
       url: r.url,
-      snippet: r.description,
+      snippet: stripHtml(r.description),
     }));
   return { sources, retrievalMs: ms };
 }
@@ -105,9 +127,9 @@ export async function llmContext(query: string): Promise<RetrievalResult> {
     .filter((item) => item.url)
     .map((item, i) => ({
       index: i + 1,
-      title: item.title || item.url,
+      title: stripHtml(item.title) || item.url,
       url: item.url,
-      snippet: item.snippets.join(" "),
+      snippet: stripHtml(item.snippets.join(" ")),
     }));
 
   if (sources.length === 0) {
