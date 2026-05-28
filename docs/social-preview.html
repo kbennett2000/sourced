@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1280px;
+        height: 640px;
+      }
+      body {
+        background: radial-gradient(1100px 560px at 82% -12%, #2a1206 0%, #0a0a0a 56%);
+        color: #fafafa;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 84px 96px;
+        position: relative;
+      }
+      .accent {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 10px;
+        background: #ea580c;
+      }
+      .brand {
+        font-size: 124px;
+        font-weight: 800;
+        letter-spacing: -4px;
+        line-height: 1;
+      }
+      .brand .dot {
+        color: #ea580c;
+      }
+      .tagline {
+        margin-top: 24px;
+        font-size: 37px;
+        font-weight: 500;
+        color: #a3a3a3;
+      }
+      .panel {
+        margin-top: 50px;
+        display: flex;
+        gap: 18px;
+      }
+      .stat {
+        border: 1px solid #262626;
+        border-radius: 16px;
+        padding: 18px 28px;
+        background: rgba(17, 17, 17, 0.8);
+      }
+      .stat .label {
+        font-size: 17px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        color: #fb923c;
+      }
+      .stat .row {
+        margin-top: 8px;
+        font-size: 30px;
+        font-weight: 700;
+      }
+      .stat .row .muted {
+        color: #737373;
+        font-weight: 500;
+      }
+      .url {
+        position: absolute;
+        left: 96px;
+        bottom: 54px;
+        font-size: 23px;
+        color: #737373;
+      }
+      .url b {
+        color: #d4d4d4;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="accent"></div>
+    <div class="brand">Sourced<span class="dot">.</span></div>
+    <div class="tagline">Web Search vs LLM Context — visible tradeoffs.</div>
+    <div class="panel">
+      <div class="stat">
+        <div class="label">Web Search</div>
+        <div class="row">10 sources <span class="muted">· 486 ms</span></div>
+      </div>
+      <div class="stat">
+        <div class="label">LLM Context</div>
+        <div class="row">11 sources <span class="muted">· 640 ms</span></div>
+      </div>
+    </div>
+    <div class="url">
+      <b>sourced-zeta.vercel.app</b> · Brave Search API · Next.js · Claude
+    </div>
+  </body>
+</html>
