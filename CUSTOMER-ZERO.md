@@ -3,7 +3,9 @@
 Friction encountered while building Sourced against the Brave Search API (and the
 surrounding stack), with suggested fixes. These are real issues hit during
 development, not hypotheticals — written from the perspective of a developer
-reaching "first successful call."
+reaching "first successful call." Two of the six (items 4 and 6) are about the
+surrounding stack — the Vercel AI SDK and pnpm — rather than Brave itself;
+they're kept here for honesty about what time-to-first-call actually felt like.
 
 ---
 
@@ -14,7 +16,9 @@ reaching "first successful call."
 `/res/v1/llm/context` it was much harder to pin down what the JSON actually looks
 like — I ended up calling the endpoint live and inspecting the payload to confirm
 it's `grounding.generic[]` with `{ url, title, snippets[] }`. Writing a typed,
-validated client against docs alone wasn't possible.
+validated client against docs alone wasn't possible. I wrote a tolerant Zod
+schema (`lib/types.ts`) so the client survives shape drift, but a published
+schema would have made that defensive layer unnecessary.
 
 **Fix:** Publish a complete, copy-pasteable response schema + a real example for
 `/llm/context`, at parity with the web-search docs. A JSON Schema or TypeScript
