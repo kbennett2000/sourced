@@ -123,5 +123,9 @@ No `vercel.json` is needed — the route declares `runtime = "nodejs"` itself.
   leading MCP search backend, so this is a natural fit.
 - **More Brave endpoints** — news, images, and video for richer answers.
 
+And if this were a real Brave-published reference, [docs/launch-playbook.md](docs/launch-playbook.md)
+sketches how I'd ship the surrounding content — blog, notebook, launch-day
+channels, community norms, and the metrics that would actually matter.
+
 See [CUSTOMER-ZERO.md](CUSTOMER-ZERO.md) for friction encountered while building
 this, with suggested fixes.
