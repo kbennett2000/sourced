@@ -1,13 +1,14 @@
 # Sourced
 
-A grounded answer engine: ask a question, get a streamed answer with inline
-citations and source cards, powered by the [Brave Search API](https://brave.com/search/api/).
+Sourced is a working reference app for the [Brave Search API](https://brave.com/search/api/),
+built for developers evaluating Brave for RAG and agent use cases. It exists to
+make one tradeoff visible: Brave's two retrieval endpoints — **Web Search** and
+**LLM Context** — behind a single toggle, with source count and retrieval latency
+shown on every query.
 
 **Live demo:** https://sourced-zeta.vercel.app
 
-The point of this project is to make one tradeoff obvious: **Web Search vs LLM
-Context**, Brave's two retrieval endpoints. A toggle switches between them and a
-stats bar shows the difference (source count + retrieval latency) on every query.
+![Sourced — answering with citations](docs/images/02-answering.png)
 
 ## Time to first call
 
@@ -30,6 +31,9 @@ pnpm dev                        # http://localhost:3000
 | `BRAVE_API_KEY` | [Brave Search API dashboard](https://api-dashboard.search.brave.com) — subscription token |
 | `ANTHROPIC_API_KEY` | [Anthropic Console](https://console.anthropic.com) — `sk-ant-...` |
 
+> The `Search` plan (from $5/1K, with a $5 free monthly credit) covers both
+> endpoints the toggle uses — no separate subscription needed.
+
 Optional: `RATE_LIMIT_MAX` (default 30) and `RATE_LIMIT_WINDOW_MS` (default
 3600000 = 1h) tune the per-IP limit.
 
@@ -50,6 +54,17 @@ turning the web into grounding context.
 The stats bar surfaces `source_count` and `retrieval_ms` per run so the
 difference is visible rather than described.
 
+![The same question re-run on LLM Context](docs/images/03-llm-context.png)
+
+*The same question on each endpoint — the stats bar shows the difference in
+source count and retrieval latency. That visible diff is the whole point.*
+
+LLM Context sometimes returns JSON or table chunks instead of prose; Sourced
+detects these and collapses them behind a toggle rather than dumping raw markup
+into a source card:
+
+![A non-prose LLM Context snippet, collapsed](docs/images/04-snippet-collapse.png)
+
 ## How it works
 
 ```
@@ -68,6 +83,8 @@ and the [ADRs](docs/adr/) for key decisions (stack, stream transport, rate limit
 
 ## Tests
 
+> Pure-function + mocked-route only — runs in ~1s and needs no API keys.
+
 ```bash
 pnpm test        # vitest, runs in ~1s
 pnpm typecheck   # tsc --noEmit (strict)
@@ -77,8 +94,7 @@ pnpm lint        # eslint
 Covered: the Brave client (normalization + error handling for both endpoints),
 the stream prelude builder, the `[n]` citation parser, the snippet classifier
 (prose vs JSON/table/code), the rate limiter (cap + window + reset), and the
-answer route (rate-limit headers + 429 shape, with the AI SDK mocked). The suite
-is pure-function + mocked-route only, so it stays fast and needs no keys.
+answer route (rate-limit headers + 429 shape, with the AI SDK mocked).
 
 ## Deploy
 
