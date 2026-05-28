@@ -4,7 +4,7 @@ import { BraveError, llmContext, webSearch } from "@/lib/brave";
 import { logger } from "@/lib/logger";
 import { buildPrelude } from "@/lib/prelude";
 import { buildContext, buildSystemPrompt } from "@/lib/prompt";
-import { checkRateLimit } from "@/lib/ratelimit";
+import { checkRateLimit, type RateLimitResult } from "@/lib/ratelimit";
 import { AnswerRequestSchema, type RetrievalResult } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -17,11 +17,23 @@ function clientIp(req: Request): string {
   return req.headers.get("x-real-ip") ?? "unknown";
 }
 
-function json(body: unknown, status: number): Response {
+function json(
+  body: unknown,
+  status: number,
+  headers?: Record<string, string>,
+): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...headers },
   });
+}
+
+function rateLimitHeaders(rl: RateLimitResult): Record<string, string> {
+  return {
+    "X-RateLimit-Limit": String(rl.limit),
+    "X-RateLimit-Remaining": String(rl.remaining),
+    "X-RateLimit-Reset": String(Math.floor(rl.resetAt / 1000)), // epoch seconds
+  };
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -40,9 +52,15 @@ export async function POST(req: Request): Promise<Response> {
 
   // 2. Rate-limit by IP.
   const ip = clientIp(req);
-  if (!checkRateLimit(ip).allowed) {
+  const rl = checkRateLimit(ip);
+  if (!rl.allowed) {
+    const retryAfterSeconds = Math.max(0, Math.ceil((rl.resetAt - Date.now()) / 1000));
     logger.warn("answer.rate_limited", { ip });
-    return json({ error: "Rate limit exceeded. Try again shortly." }, 429);
+    return json(
+      { error: "Rate limit exceeded. Try again later.", retryAfterSeconds },
+      429,
+      { ...rateLimitHeaders(rl), "Retry-After": String(retryAfterSeconds) },
+    );
   }
 
   // Privacy (SPEC §7): never log the full query, only its length.
@@ -96,6 +114,7 @@ export async function POST(req: Request): Promise<Response> {
         "Content-Type": "text/plain; charset=utf-8",
         "Cache-Control": "no-store",
         "X-Accel-Buffering": "no",
+        ...rateLimitHeaders(rl),
       },
     });
   } catch (err) {
